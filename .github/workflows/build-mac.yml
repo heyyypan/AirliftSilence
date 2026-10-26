@@ -3,20 +3,23 @@ name: Build macOS .app
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许在 GitHub 网页上手动点按钮触发
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
-    permissions:
-      contents: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            artifact: AirliftSilence-Intel
+          - runner: macos-latest
+            artifact: AirliftSilence-M芯片
+    runs-on: ${{ matrix.runner }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -25,10 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify tkinter
-        run: python -c "import tkinter; print('tkinter OK')"
-
-      - name: Build .app with PyInstaller
+      - name: Build .app
         run: |
           pyinstaller \
             --onefile \
@@ -37,7 +37,6 @@ jobs:
             --add-data "silent/StartDisclosureWithTone.m4a:silent" \
             --add-data "silent/StopDisclosure.caf:silent" \
             --osx-bundle-identifier "com.airliftsilence.app" \
-            --target-architecture universal2 \
             airlift_gui.py
 
       - name: Patch Info.plist
@@ -45,28 +44,13 @@ jobs:
           PLIST="dist/AirliftSilence.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1.0.0" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Set :NSHumanReadableCopyright 'Copyright (c) 2026 AirliftSilence contributors'" "$PLIST" || true
 
       - name: Ad-hoc codesign
         run: |
           codesign --force --deep --sign - dist/AirliftSilence.app || true
 
-      - name: Package as zip
-        run: |
-          cd dist
-          zip -r AirliftSilence-mac.zip AirliftSilence.app
-          cd ..
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AirliftSilence-mac-app
-          path: dist/AirliftSilence-mac.zip
-
-      - name: Create Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/AirliftSilence-mac.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ matrix.artifact }}
+          path: dist/AirliftSilence.app
