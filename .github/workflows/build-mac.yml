@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     permissions:
       contents: write
 
@@ -37,6 +37,7 @@ jobs:
             --add-data "silent/StartDisclosureWithTone.m4a:silent" \
             --add-data "silent/StopDisclosure.caf:silent" \
             --osx-bundle-identifier "com.airliftsilence.app" \
+            --target-architecture universal2 \
             airlift_gui.py
 
       - name: Patch Info.plist
